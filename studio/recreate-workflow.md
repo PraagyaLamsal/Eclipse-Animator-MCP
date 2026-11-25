@@ -6,7 +6,7 @@ Use this resource with your vault's `replicate-anything` and `rbx-video-referenc
 
 1. Call `eclipse_list_studios` and `eclipse_select_studio` with the intended Studio ID. Run `eclipse_capabilities` and confirm `Build` is `v1.0979`, `Version` is 6, and `mcpVersion` is 1.
 2. Record the reference's source FPS and timestamps. Use the vault's reference tools to mark anticipation, contact, flash, camera cuts, holds, and recovery. Keep observed poses and timings distinct from estimates for occluded frames.
-3. Inspect project and rig tracks with `ProjectInfo`, `ListTracks`, `ListProperties`, `ListKeys`, and `ListIK`. Preserve the actual player avatar handoff in the game. Use inherited `video_to_animation` or `import_animation_pack` for an editable source clip when appropriate. Open it using `OpenProject`.
+3. Inspect project and rig tracks with `ProjectInfo`, `ListTracks`, `ListProperties`, `ListKeys`, and `ListIK`. Preserve the actual player avatar handoff in the game. Use inherited `video_to_animation` or `import_animation_pack` for an editable source clip when appropriate. For close reference matching, pass `preserve_timeline: true` and compare `smoothing_window: 1` against the default around fast impacts. Open the clip using `OpenProject`.
 4. Audition 10–20 distinct textures per major effect per round from authorized vault and catalog assets. Keep camera, coverage, lighting, and effect settings fixed. Capture contact, peak, and fade and inspect the flipbook in motion. Use the largest mismatch as the next search query until a candidate is close enough or the remaining mismatch is explicitly known. Avoid ContentProvider preloads through Studio MCP.
 
 ## Timeline protocol

@@ -137,25 +137,29 @@ const rig = z.string().describe('Rig full name from list_rigs (e.g. "Workspace.R
 const here = path.dirname(fileURLToPath(import.meta.url))
 const run = promisify(execFile)
 
-async function videoFrames(file, fps, start, end) {
+async function videoFrames(file, fps, start, end, smoothingWindow, preserveTimeline) {
   file = path.resolve(file.replace(/^~(?=\/|$)/, os.homedir()))
   if (!fs.existsSync(file)) throw new Error(`Video not found: ${file}`)
+  const paths = [process.env.PATH, path.join(os.homedir(), '.local', 'bin')]
+  if (process.platform === 'darwin') paths.push('/opt/homebrew/bin', '/usr/local/bin')
+  const env = { ...process.env, PATH: paths.filter(Boolean).join(path.delimiter) }
   let out
   try {
-    out = await run('uv', ['run', '--quiet', '--with', 'mediapipe', 'python', '-I', path.join(here, 'video_pose.py'), file,
-      '--fps', String(fps), '--start', String(start), '--end', String(end)], { maxBuffer: 1 << 28 })
+    out = await run('uv', ['run', '--quiet', '--no-project', '--python', '3.12', '--with', 'mediapipe', 'python', '-I', path.join(here, 'video_pose.py'), file,
+      '--fps', String(fps), '--start', String(start), '--end', String(end)], { env, maxBuffer: 1 << 28, timeout: 240000 })
   } catch (e) {
     if (e.code === 'ENOENT') throw new Error('Video import needs "uv" (https://docs.astral.sh/uv/) and ffmpeg. Run the installer again or install them.')
     throw new Error(`Could not read the video: ${e.stderr?.split('\n').filter(l => !/^[WI]\d{4}/.test(l)).join('\n').trim() || e.message}`)
   }
   const { frames, total } = JSON.parse(out.stdout)
   if (frames.length < 2) throw new Error(`No person found in the video (${total} frames checked). Use a clip where one whole body is clearly visible.`)
-  // centered 5-frame moving average: pose detection jitters frame to frame
+  const radius = Math.floor(smoothingWindow / 2)
+  const origin = preserveTimeline ? 0 : frames[0].t
   return frames.map((f, i) => {
-    const near = frames.slice(Math.max(0, i - 2), i + 3)
+    const near = frames.slice(Math.max(0, i - radius), i + radius + 1)
     const p = {}
     for (const n of Object.keys(f.p)) p[n] = [0, 1, 2].map(k => near.reduce((s, g) => s + g.p[n][k], 0) / near.length)
-    return { t: Math.round((f.t - frames[0].t) * 1e4) / 1e4, p }
+    return { t: Math.round((f.t - origin) * 1e4) / 1e4, p }
   })
 }
 
@@ -246,9 +250,12 @@ server.registerTool('video_to_animation', {
     fps: z.number().min(5).max(60).optional().describe('Keyframes per second. Default 30.'),
     start: z.number().min(0).optional().describe('Start time in seconds. Default 0.'),
     end: z.number().min(0).optional().describe('End time in seconds. Default: end of video.'),
+    smoothing_window: z.number().int().min(1).max(15).refine(value => value % 2 === 1)
+      .optional().describe('Centered smoothing in frames. Default 5. Set 1 to preserve fast contacts.'),
+    preserve_timeline: z.boolean().optional().describe('Keep source timestamps relative to the trim, including gaps before the first valid pose.'),
   },
-}, async ({ rig, video_path, name, loop, fps = 30, start = 0, end = 0 }) => {
-  const frames = await videoFrames(video_path, fps, start, end)
+}, async ({ rig, video_path, name, loop, fps = 30, start = 0, end = 0, smoothing_window = 5, preserve_timeline = false }) => {
+  const frames = await videoFrames(video_path, fps, start, end, smoothing_window, preserve_timeline)
   return reply(await call('retarget', { rig, name, loop, frames }, 120))
 })
 
