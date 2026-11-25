@@ -408,6 +408,7 @@ function cutscene.bind(refs, access)
 		assert(camera.isRig(model), "Choose an Eclipse camera rig")
 		local frame = integer(request.Frame, "frame", 0, 1000000)
 		assert(request.View or request.FOV, "Provide View or FOV")
+		assert(request.FOV == nil or finite(request.FOV) and request.FOV >= 1 and request.FOV <= 120, "Invalid camera FOV")
 		local clipCamera = model
 		local result = {}
 		if request.View then
@@ -418,7 +419,6 @@ function cutscene.bind(refs, access)
 			result.CFrame = access.setKey({ Target = clipCamera, Property = "CFrame", Frame = frame, Value = value, Easing = request.Easing })
 		end
 		if request.FOV then
-			assert(finite(request.FOV) and request.FOV >= 1 and request.FOV <= 120, "Invalid camera FOV")
 			result.FOV = access.setKey({ Target = clipCamera, Property = "FieldOfView", Frame = frame, Value = request.FOV, Easing = request.Easing })
 		end
 		return result

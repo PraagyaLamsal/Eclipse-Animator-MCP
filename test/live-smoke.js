@@ -126,19 +126,28 @@ if ((await act('GetInfo')).Actions.includes('CreateScreenEffect')) {
     return { kind: effect.Kind, editorCommands: commands.Commands.length }
   })
   await verify('retime a specific key with native selection', async () => {
+    const before = await act('ListKeys', { Target: arm })
+    const expected = before[0].Keys.map(key => key.Frame === 9 ? 11 : key.Frame).sort((a, b) => a - b)
     await act('RetimeKeys', { Keys: [{ Target: arm, Frame: 9 }], Delta: 2 })
     const keys = await act('ListKeys', { Target: arm })
-    assert.deepEqual(keys[0].Keys.map(key => key.Frame), [0,11,18])
+    assert.deepEqual(keys[0].Keys.map(key => key.Frame), expected)
   })
   await verify('headless camera attachment and motion path', async () => {
     assert(camera, 'Camera setup failed')
     await act('SetParenting', { Rig: camera, Frame: 48, Mode: 'CameraAttachment',
       Parent: target(['Workspace','McpR15Fixture','HumanoidRootPart']) })
     const vec = values => ({ $type: 'Vector3', values })
-    await act('ApplyMotionPath', { Target: camera, Property: 'CFrame', First: 40, Last: 44,
-      Step: 2, Points: [vec([1,6,10]),vec([2,6,11]),vec([3,6,11])] })
-    const keys = await act('ListKeys', { Target: camera, Property: 'CFrame', First: 40, Last: 44 })
-    assert.deepEqual(keys[0].Keys.map(key => key.Frame), [40,42,44])
+    const preference = await act('ReadPreferences', { Keys: ['TransformChannels'] })
+    const enabled = preference.Values.TransformChannels
+    try {
+      if (!enabled) await act('SetPreferences', { Changes: { TransformChannels: true } })
+      await act('ApplyMotionPath', { Target: camera, Property: 'CFrame', First: 40, Last: 44,
+        Step: 2, Points: [vec([1,6,10]),vec([2,6,11]),vec([3,6,11])] })
+      const keys = await act('ListKeys', { Target: camera, Property: 'CFrame', First: 40, Last: 44 })
+      assert.deepEqual(keys[0].Keys.map(key => key.Frame), [40,42,44])
+    } finally {
+      if (!enabled) await act('SetPreferences', { Changes: { TransformChannels: false } })
+    }
   })
 }
 await verify('save, archive, and reopen Eclipse project', async () => {

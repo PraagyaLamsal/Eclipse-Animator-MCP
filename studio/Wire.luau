@@ -2,11 +2,12 @@ local wire = {}
 local ids = setmetatable({}, { __mode = "k" })
 local objects = setmetatable({}, { __mode = "v" })
 local serial = 0
+local session = game:GetService("HttpService"):GenerateGUID(false)
 
 local function reference(value)
 	if not ids[value] then
 		serial += 1
-		local id = tostring(serial)
+		local id = session .. ":" .. tostring(serial)
 		ids[value], objects[id] = id, value
 	end
 	return ids[value]

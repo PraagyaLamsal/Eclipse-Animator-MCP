@@ -95,6 +95,15 @@ local changeLimit = 256]] },
 ]] },
 	{ 'assert(not refs.State.Timeline:GetState().Playing, "Pause playback before editing")', [[if action == "Playback" or action == "SeekFrame" then return perform(action, request) end
 	assert(not refs.State.Timeline:GetState().Playing, "Pause playback before editing")]] },
+	{ 'if edits[action] then\n\t\tassert(', [[if mcp.edits[action] and not batch and request.Record == nil then
+		local entries, result = captured(function()
+			return perform(action, request)
+		end)
+		commit(typeof(request.Name) == "string" and request.Name or "MCP " .. action, entries)
+		return result
+	end
+	if edits[action] then
+		assert(]] },
 	{ "function api.invoke(action, request)\n", [[function api.invoke(action, request)
 	if action == "McpRequest" then
 		local decoded, value = pcall(wire.decode, request.Request or {})
