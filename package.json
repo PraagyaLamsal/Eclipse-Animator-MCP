@@ -6,7 +6,8 @@
   "scripts": {
     "test": "node --test test.js enhance.test.js",
     "test:r6": "lune run test/r6.luau",
-    "sync-r6": "node scripts/sync-r6.js"
+    "sync-r6": "node scripts/sync-r6.js",
+    "install:native": "node scripts/install-native.js"
   },
   "author": "VuxSussy",
   "license": "MIT",

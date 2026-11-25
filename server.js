@@ -11,6 +11,10 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { enhance } from './enhance.js'
+import { callClip } from './studio/connection.js'
+import { registerStudioTools } from './studio/tools.js'
+
+const nativeTransport = process.env.ECLIPSE_STUDIO_TRANSPORT === '1'
 
 const PORT = Number(process.env.ECLIPSE_MCP_PORT) || 44755
 const queue = []
@@ -93,10 +97,11 @@ const listen = () => new Promise(resolve => {
   const fail = () => done(false), win = () => done(true)
   bridge.once('error', fail).once('listening', win).listen(PORT, '127.0.0.1')
 })
-await listen()
+if (!nativeTransport) await listen()
 
 // Own the bridge if the port is free (or was freed), else relay to the instance that owns it.
 async function call(tool, args, seconds = 30) {
+  if (nativeTransport) return callClip(tool, args, seconds)
   if (bridge.listening || await listen()) return send(tool, args, seconds)
   let res
   try {
@@ -169,12 +174,15 @@ const { version } = JSON.parse(fs.readFileSync(path.join(here, 'package.json'), 
 const server = new McpServer({ name: 'eclipse-animator', title: 'Eclipse Animator', version }, {
   instructions: `Eclipse Animator MCP makes Roblox animations in the open Roblox Studio place. Many users do not code: talk simply, avoid jargon, and do the steps for them.
 - Start with list_rigs to find the rig and its animatable parts.
+- For live Eclipse projects and the Replicate Anything workflow, read eclipse://recreate-workflow. Select the intended Studio window, check native capabilities, and verify exact-frame and playtest captures.
 - After creating or changing an animation, call preview_animation so the user sees it move in the viewport, then ask if they want changes.
 - Animations are saved in the rig's AnimSaves folder; the user opens them in Eclipse Animator to polish. Saving under an existing name replaces it (Ctrl+Z in Studio undoes), so pick new names unless asked to replace.
 - Pose rot is in degrees around the joint's own axes, which differ between rigs: read an existing animation with get_animation to learn them, and check with preview_animation.
 - Bone rigs (list_rigs shows bones, e.g. a phoenix or dragon): key bones by name like parts. A bone's rot and pos are in its own axes, often nothing like the world's: read an existing animation with get_animation first, and preview before building a whole clip.
 - R6 rigs (list_rigs shows r6: true): use the R6 kit. Read r6_guide (overview, then posing) once per task. Reference first: study_animation on a similar existing animation before posing. Author with save_r6_animation (named angles + short slides, smooth weighted timing) and fix its audit notes until clean. Ready combat/movement clips: import_r6_kit. An R6 animation that looks stiff or floaty: smooth_r6_animation.`,
 })
+
+registerStudioTools(server)
 
 server.registerTool('list_rigs', {
   title: 'List rigs',

@@ -10,6 +10,22 @@ Claude ──stdio──> server.js ──HTTP 127.0.0.1:44755──> Studio plu
 
 This repo does **not** include Eclipse Animator or any of its code. You need your own licensed copy of the plugin.
 
+## Live Eclipse cutscenes in this fork
+
+The native bridge targets Eclipse Animator **v1.0979 / API v6**. It opens an editable Eclipse project and provides keyframe readback, grouped edits, camera view and FOV, curves, native IK, effects cues, project persistence, and access to installed editor commands. The upstream clip, R6, and video import tools are available alongside the live editor. See [supported requests and reference workflow](studio/recreate-workflow.md).
+
+Build a single Studio file from your existing Eclipse Animator model using Lune 0.11.1 or compatible:
+
+```sh
+npm ci
+lune run scripts/bundle.luau "/path/to/Eclipse Animator.rbxm" "/path/to/Eclipse Animator AI v1.0979.rbxm"
+npm run install:native -- "/path/to/Eclipse Animator AI v1.0979.rbxm"
+```
+
+The build applies version-specific patch anchors and bundles the clip bridge inside the one output model. Your Eclipse model and generated model stay local. The installer can also run without a file argument to register just the desktop MCP. Reopen Studio after putting the bundle in the Plugins folder, enable Roblox Studio MCP in Assistant settings, and reload the AI client. A Claude session can use `eclipse_list_studios`, `eclipse_select_studio`, and `eclipse_capabilities` to verify the connection. Keep one Eclipse editor build enabled in the window targeted for automation.
+
+The following sections describe the inherited clip tools and legacy setup. For live cutscene editing, use the native setup above.
+
 ## What it can do
 
 | Tool | What it does |

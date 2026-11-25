@@ -7,13 +7,16 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 const PORT = '44799'
 const URL = `http://127.0.0.1:${PORT}`
 
-test('tool call round-trips through the Studio bridge', async () => {
+test('tool call round-trips through the Studio bridge', async (t) => {
   const client = new Client({ name: 'test', version: '0' })
+  t.after(() => client.close())
   await client.connect(new StdioClientTransport({ command: process.execPath, args: ['server.js'], env: { ...process.env, ECLIPSE_MCP_PORT: PORT } }))
   const { tools } = await client.listTools()
-  assert.deepEqual(tools.map(t => t.name).sort(), ['enhance_animation', 'get_animation', 'import_animation_pack', 'import_r6_kit', 'list_rigs', 'preview_animation', 'r6_guide', 'save_animation', 'save_r6_animation', 'smooth_r6_animation', 'study_animation', 'video_to_animation'])
+  assert.deepEqual(tools.filter(t => !t.name.startsWith('eclipse_')).map(t => t.name).sort(), ['enhance_animation', 'get_animation', 'import_animation_pack', 'import_r6_kit', 'list_rigs', 'preview_animation', 'r6_guide', 'save_animation', 'save_r6_animation', 'smooth_r6_animation', 'study_animation', 'video_to_animation'])
   for (const t of tools) assert.ok(t.title && t.annotations, `${t.name} has a title and annotations`)
   assert.equal(tools.find(t => t.name === 'list_rigs').annotations.readOnlyHint, true)
+  assert.ok(tools.some(t => t.name === 'eclipse_action' && JSON.stringify(t.inputSchema).includes('KeyCamera')))
+  assert.ok((await client.listResources()).resources.some(r => r.uri === 'eclipse://recreate-workflow'))
   assert.equal(client.getServerVersion().version, JSON.parse(await (await import('node:fs/promises')).readFile('package.json', 'utf8')).version)
 
   // fake plugin: answer one command successfully, one with an error

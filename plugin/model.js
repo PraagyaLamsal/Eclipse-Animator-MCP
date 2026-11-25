@@ -13,5 +13,5 @@ export function pluginModel() {
   const modules = fs.readdirSync(path.join(here, 'R6')).filter(f => f.endsWith('.luau')).sort()
     .map(f => item('ModuleScript', f.slice(0, -5), fs.readFileSync(path.join(here, 'R6', f), 'utf8'))).join('')
   const main = fs.readFileSync(path.join(here, 'EclipseAnimatorMCP.server.luau'), 'utf8')
-  return '<roblox version="4">' + item('Script', 'EclipseAnimatorMCP', main, item('Folder', 'R6', null, modules)) + '</roblox>'
+  return '<roblox version="4">' + item('Script', 'EclipseAnimatorMCP', main, item('Folder', 'R6', null, modules) + item('ModuleScript', 'ClipStorage', fs.readFileSync(path.join(here, 'ClipStorage.luau'), 'utf8'))) + '</roblox>'
 }

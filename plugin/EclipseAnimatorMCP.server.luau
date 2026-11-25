@@ -6,6 +6,7 @@ local AssetService = game:GetService("AssetService")
 local InsertService = game:GetService("InsertService")
 local Players = game:GetService("Players")
 local KeyframeSequenceProvider = game:GetService("KeyframeSequenceProvider")
+local ClipStorage = require(script:WaitForChild("ClipStorage"))
 local R6 = require(script:WaitForChild("R6"):WaitForChild("R6Bridge")) -- the R6 animation kit
 
 if RunService:IsRunning() then
@@ -119,78 +120,29 @@ local function rigJoints(rig)
 	return root, order
 end
 
-local function animSaves(rig)
-	local folder = rig:FindFirstChild("AnimSaves")
-	if not folder then
-		folder = Instance.new("Folder")
-		folder.Name = "AnimSaves"
-		folder.Parent = rig
-	end
-	return folder
-end
-
--- Roblox's own Animation Editor saves to ServerStorage.RBX_ANIMSAVES.<ObjectValue pointing at the rig>
-local function editorSaves(rig)
-	local list = {}
-	local store = game:GetService("ServerStorage"):FindFirstChild("RBX_ANIMSAVES")
-	for _, link in store and store:GetChildren() or {} do
-		if link:IsA("ObjectValue") and link.Value == rig then
-			for _, ks in link:GetChildren() do
-				if ks:IsA("KeyframeSequence") then
-					table.insert(list, ks)
-				end
-			end
-		end
-	end
-	return list
-end
-
--- every animation of a rig: AnimSaves (Eclipse Animator), the model itself, the Animation Editor's saves
-local function rigSequences(rig)
-	local list = {}
-	local saves = rig:FindFirstChild("AnimSaves")
-	for _, s in saves and saves:GetChildren() or {} do
-		if s:IsA("KeyframeSequence") then
-			table.insert(list, s)
-		end
-	end
-	for _, s in rig:GetChildren() do
-		if s:IsA("KeyframeSequence") then
-			table.insert(list, s)
-		end
-	end
-	local editor = editorSaves(rig)
-	table.move(editor, 1, #editor, #list + 1, list)
-	return list
+local function rigEntries(rig)
+	return ClipStorage.entries(rig, game:GetService("ServerStorage"):FindFirstChild("RBX_ANIMSAVES"))
 end
 
 local function getSequence(rig, name)
-	local seq
-	for _, s in rigSequences(rig) do
-		if s.Name == name then
-			seq = s
-			break
-		end
-	end
-	if not (seq and seq:IsA("KeyframeSequence")) then
-		error("no animation named " .. tostring(name) .. " on " .. rig.Name .. ". Call list_rigs to see its animations.", 0)
-	end
-	return seq
+	local sequence = ClipStorage.resolve(rigEntries(rig), name)
+	assert(sequence, "No animation named " .. tostring(name) .. " on " .. rig.Name)
+	return sequence
 end
 
-local function saveSequence(rig, seq)
-	local recording = ChangeHistoryService:TryBeginRecording("Eclipse MCP: save " .. seq.Name)
-	local saves = animSaves(rig)
-	local old = saves:FindFirstChild(seq.Name)
-	if old then
-		old:Destroy()
-	end
-	seq.Parent = saves
+local function saveSequence(rig, sequence)
+	local recording = ChangeHistoryService:TryBeginRecording("Eclipse MCP: save " .. sequence.Name)
+	local ok, result = pcall(ClipStorage.save, rig, sequence, Instance)
 	if recording then
-		ChangeHistoryService:FinishRecording(recording, Enum.FinishRecordingOperation.Commit)
+		ChangeHistoryService:FinishRecording(recording,
+			if ok then Enum.FinishRecordingOperation.Commit else Enum.FinishRecordingOperation.Cancel)
 	end
-	note("Saved " .. seq.Name .. " on " .. rig.Name)
-	return { saved = seq:GetFullName(), keyframes = #seq:GetKeyframes() }
+	if not ok then
+		sequence:Destroy()
+		error(result, 0)
+	end
+	note("Saved " .. sequence.Name .. " on " .. rig.Name)
+	return { saved = sequence:GetFullName(), keyframes = #sequence:GetKeyframes() }
 end
 
 -- frames: { { time, poses = { [partName] = { cf, easing?, direction? } } } } -> KeyframeSequence
@@ -431,8 +383,8 @@ function handlers.list_rigs()
 				table.insert(m.bone and bones or parts, m.Part1.Name)
 			end
 			table.sort(parts)
-			for _, s in rigSequences(d) do
-				table.insert(anims, s.Name)
+			for _, entry in rigEntries(d) do
+				table.insert(anims, entry.entry.Name)
 			end
 			-- bones stay parents-first (Root, Body, Wing1_L, Wing2_L...): their order says the chain
 			table.insert(rigs, { rig = d:GetFullName(), r6 = R6.isR6(d), parts = parts, bones = #bones > 0 and bones or nil, animations = anims })
@@ -664,6 +616,26 @@ plugin.Unloading:Connect(function()
 		stop()
 	end
 end)
+
+if script:GetAttribute("EclipseBuiltInTransport") == true then
+	local endpoint = Instance.new("BindableFunction")
+	endpoint.Name = "EclipseAnimatorClipAPI"
+	endpoint:SetAttribute("ProtocolVersion", 1)
+	endpoint.OnInvoke = function(tool, args)
+		local handler = handlers[tool]
+		if not handler then return { ok = false, error = "Unknown clip tool " .. tostring(tool) } end
+		local ok, value = pcall(handler, args or {})
+		if ok then
+			connected = true
+			render()
+			return { ok = true, result = value }
+		end
+		return { ok = false, error = tostring(value) }
+	end
+	endpoint.Parent = game:GetService("CoreGui")
+	plugin.Unloading:Connect(function() endpoint:Destroy() end)
+	return
+end
 
 task.spawn(function()
 	while active do
